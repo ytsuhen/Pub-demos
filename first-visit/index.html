@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First Visit · BA demo</title>
+<meta name="description" content="A 3-minute business-analysis demo: one caregiver's first homecare visit, shown twice (texts and paper vs an app), then the visit's state machine, transition matrix and a pre-fill trade-off. By Andrii Yevenko.">
+<meta property="og:title" content="First Visit · a business analyst's walk through one homecare visit">
+<meta property="og:description" content="One user story → failure modes → requirements traced to regulation → a guarded state machine → a trade-off with a decision.">
+<meta property="og:image" content="poster.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+:root {
+  --sea-deep: #041716; --sea: #0C433C; --sea-wave: #07594A; --sea-crest: #3FB59A; --sea-ink: #E3F4EE; --sea-muted: #9CC7BB;
+  --surface: #0A2622; --surface-2: #071E1B; --line: #1D3F39; --accent: #52C4A6;
+  --pass: #6FCB98; --pass-soft: #12362A; --amber: #E8B467; --amber-soft: #3A2C15; --fail: #F28A8F; --fail-soft: #43191C;
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif; --font-title: "Source Serif 4", Georgia, serif; --font-code: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--sea-deep); }
+body { margin: 0; color: var(--sea-ink); background: var(--sea-deep); font: 17px/1.6 var(--font-ui); }
+a { color: var(--accent); }
+.hero { position: relative; overflow: hidden; background: radial-gradient(120% 90% at 20% 0%, var(--sea) 0%, #062a25 55%, var(--sea-deep) 100%); border-bottom: 1px solid var(--line); }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.wrap { position: relative; max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+.hero .wrap { padding-top: 48px; padding-bottom: 40px; }
+.kicker { font: 600 13px/1 var(--font-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--sea-muted); margin: 0 0 14px; }
+h1 { font: 600 clamp(30px, 4.4vw, 46px)/1.12 var(--font-title); margin: 0 0 12px; }
+.lede { font-size: clamp(17px, 2vw, 19px); color: var(--sea-muted); max-width: 64ch; margin: 0 0 24px; }
+.video { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 24px 60px -30px rgba(0,0,0,.8); background: #000; }
+.video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+.meta { font: 14px/1.5 var(--font-ui); color: var(--sea-muted); margin: 10px 2px 0; }
+main section { padding: 40px 0 8px; border-bottom: 1px solid var(--line); }
+h2 { font: 600 clamp(22px, 2.6vw, 28px)/1.2 var(--font-title); margin: 0 0 14px; }
+h3 { font: 600 17px/1.3 var(--font-ui); margin: 22px 0 8px; }
+p { max-width: 72ch; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.story { font: 600 clamp(18px, 2.1vw, 21px)/1.45 var(--font-title); }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; border: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 15px; background: var(--surface); }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; color: var(--sea-muted); background: var(--surface-2); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+tr:last-child td { border-bottom: none; }
+code, .mono { font-family: var(--font-code); font-size: .9em; }
+.tag { display: inline-block; padding: 1px 9px; border-radius: 999px; font: 600 13px/1.6 var(--font-ui); border: 1px solid; white-space: nowrap; }
+.tag.reg { color: var(--accent); border-color: rgba(82,196,166,.45); background: #0F3B33; }
+.tag.state { color: var(--amber); border-color: rgba(232,180,103,.45); background: var(--amber-soft); }
+.tag.design { color: var(--sea-muted); border-color: rgba(156,199,187,.35); background: transparent; }
+.tag.safety { color: var(--fail); border-color: rgba(242,138,143,.45); background: var(--fail-soft); }
+.matrix td, .matrix th { text-align: center; font-family: var(--font-code); font-size: 13px; padding: 8px 6px; }
+.matrix th:first-child, .matrix td:first-child { text-align: right; font-family: var(--font-ui); font-size: 13px; color: var(--sea-muted); white-space: nowrap; }
+.ok { color: var(--pass); } .g { color: var(--amber); font-weight: 600; } .no { color: #3b5a54; } .never { color: var(--fail); font-weight: 600; outline: 2px solid var(--fail); outline-offset: -4px; border-radius: 6px; }
+.win { color: var(--pass); } .lose { color: var(--fail); } .mid { color: var(--amber); }
+.chosen { background: var(--pass-soft); }
+svg text { font-family: var(--font-ui); }
+.sm { width: 100%; height: auto; display: block; background: var(--surface); border-radius: 12px; border: 1px solid var(--line); }
+ol.sources { padding-left: 20px; font-size: 15px; } ol.sources li { margin: 4px 0; overflow-wrap: anywhere; }
+footer { padding: 32px 0 56px; color: var(--sea-muted); font-size: 14px; }
+.who { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin: 6px 0 0; font-size: 15px; }
+.who a { font-family: var(--font-code); font-size: 14px; }
+@media (max-width: 560px) { body { font-size: 16px; } .hero .wrap { padding-top: 32px; } }
+.versions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.versions button { font: 600 14px/1 var(--font-ui); color: var(--sea-muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; cursor: pointer; }
+.versions button[aria-selected="true"] { color: var(--sea-deep); background: var(--accent); border-color: var(--accent); }
+.versions button:focus-visible { outline: 2px solid var(--sea-ink); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <canvas id="waves" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <p class="kicker">Business analysis demo · homecare / EVV</p>
+    <h1>First Visit</h1>
+    <p class="lede">One caregiver, one first visit, the same day shown twice: on the left with texts and paper, on the right with an app. Then the visit's state machine, the requirements behind it, and one trade-off with a decision.</p>
+    <div class="versions" role="tablist" aria-label="Video version">
+      <button role="tab" aria-selected="true" data-src="first-visit-text.mp4" data-meta="3:12 · no voice: the whole story on screen, made for watching with the sound off">Without voice</button>
+      <button role="tab" aria-selected="false" data-src="first-visit-narrator.mp4" data-meta="2:57 · narrated by a synthetic voice · subtitles where it speaks">Narrated</button>
+      <button role="tab" aria-selected="false" data-src="first-visit-voice.mp4" data-meta="2:46 · narration synthesized from the author's own voice · subtitles where it speaks">Author's voice</button>
+    </div>
+    <div class="video">
+      <video id="player" controls preload="metadata" playsinline poster="poster.jpg" src="first-visit-text.mp4">
+        Your browser can't play this video. <a href="first-visit-text.mp4">Download the MP4</a>.
+      </video>
+    </div>
+    <p class="meta"><span id="vmeta">3:12 · no voice: the whole story on screen, made for watching with the sound off</span> · agency, people and app are fictional</p>
+    <p class="who"><strong>Andrii Yevenko</strong> <span>Emergency physician · 7 years as a physician analyst in US healthtech</span> <a href="https://www.linkedin.com/in/andrii-yevenko">linkedin.com/in/andrii-yevenko</a> <a href="https://github.com/ytsuhen">github.com/ytsuhen</a></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>Why this demo</h2>
+    <p>I haven't worked in EVV. This is how I'd learn a new domain on day one: follow one user through one visit, list what breaks, turn each failure into a requirement, trace it to its source (law, state rule, clinical safety or plain design), and model the visit as a state machine with guarded transitions. I researched the regulation with AI tools, and every regulatory statement in the video links to a primary source below.</p>
+  </section>
+
+  <section>
+    <h2>User story</h2>
+    <div class="card story">As a caregiver on a first visit, I see only what this visit needs, so I arrive prepared and the record stays true.</div>
+    <h3>Personas</h3>
+    <p>Maria, a new caregiver (agency employee). Walter K., 82, Medicaid personal care, uses a walker, latex allergy, hard of hearing in the right ear. His wife Ruth K. lives in the same house and is also a client. The office coordinator. Walter's daughter Linda as the family contact.</p>
+  </section>
+
+  <section>
+    <h2>Failures → requirements</h2>
+    <p>Each failure on the left side of the video switched on one requirement on the right; R6 is the gate the federal EVV definition puts on verification. The source column says where each requirement comes from: a federal or state rule, clinical safety, or design.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>#</th><th>Failure (texts and paper)</th><th>Requirement</th><th>Acceptance criterion</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>R1</td><td>A one-line text: time, name, address, phone. Nothing about the entrance, the allergy or the fall risk.</td><td>A visit card with only what this visit needs: map and entry note, allergies, fall risk, hearing, care plan, family contact. Visible from <em>Scheduled</em> until <em>Completed</em>.</td><td>Given a scheduled visit, when the caregiver opens it, then she sees this client's visit fields and no other client's data.</td><td><span class="tag design">design</span> in line with HIPAA's minimum necessary principle (45 CFR 164.502(b), 164.514(d))</td></tr>
+        <tr><td>R2</td><td>Wrong entrance, 20 minutes late; the visit is noted under the wife's name (same address, two clients).</td><td>Clock-in checks location (geofence) and the person (photo + date of birth). A wrong patient is a hard stop; a geofence miss only flags.</td><td>Given two clients at one address, when the caregiver clocks in, then she must confirm the scheduled client before tasks open.</td><td><span class="tag design">design</span> derived from the EVV elements "individual receiving the service" and "location of service delivery" (42 U.S.C. 1396b(l)(5)(A))</td></tr>
+        <tr><td>R3</td><td>Latex gloves from her own bag.</td><td>An allergy banner that must be acknowledged before the task list unlocks.</td><td>Given an allergy on file, when the visit starts, then tasks stay locked until the caregiver acknowledges it.</td><td><span class="tag safety">clinical safety</span></td></tr>
+        <tr><td>R4</td><td>She leaves and never notes the end time.</td><td>Leaving the geofence prompts "Clock out?" with a summary; a visit still open at end + 30 min (agency setting) is flagged.</td><td>Given a visit open at end + 30 min, when there is no clock-out, then status = Flagged and the coordinator is notified.</td><td><span class="tag design">design</span> derived from "time the service begins and ends" (42 U.S.C. 1396b(l)(5)(A)); CMS: a check-in without a check-out may lead to exceptions</td></tr>
+        <tr><td>R6</td><td>The office can't tell whether the visit record is complete enough to bill.</td><td>A visit moves from <em>Completed</em> to <em>Verified</em> only when all six EVV elements are present.</td><td>Given a completed visit, when any of the six elements is missing, then it stays out of Verified and is flagged for review.</td><td><span class="tag reg">federal definition</span> 42 U.S.C. 1396b(l)(5)(A): type of service, individual receiving, date, location, individual providing, begin and end time</td></tr>
+        <tr><td>R5</td><td>Next morning the office guesses an end time with no reason code; in Ohio a claim with no matching EVV visit is denied.</td><td>A manual fix needs a reason code and a supervisor's sign-off; the original record is kept.</td><td>Given a Flagged visit, when someone edits its times, then a reason code and supervisor approval are required and the original values stay in the audit trail.</td><td><span class="tag state">state rules</span> reason codes (e.g. Texas, Ohio, Arizona) + <span class="tag design">design</span> (supervisor sign-off)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>The visit as a state machine</h2>
+    <svg class="sm" viewBox="0 0 960 380" role="img" aria-label="Visit state machine: Scheduled to Clocked in to In progress to Completed to Verified, which forks to Claim and Payroll; In progress can go to Flagged, and Flagged returns to Verified with a reason code and supervisor sign-off.">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9CC7BB"/></marker></defs>
+      <rect x="40" y="60" width="580" height="104" rx="18" fill="rgba(82,196,166,0.07)" stroke="rgba(82,196,166,0.35)" stroke-dasharray="6 6"/>
+      <text x="56" y="52" fill="#52C4A6" font-size="13" font-weight="600">R1 · visit card visible (only what this visit needs)</text>
+      <g font-size="15" font-weight="600" fill="#E3F4EE" text-anchor="middle">
+        <rect x="56" y="92" width="120" height="40" rx="20" fill="#0F3B33" stroke="#52C4A6"/><text x="116" y="117">Scheduled</text>
+        <rect x="206" y="92" width="120" height="40" rx="20" fill="#0F3B33" stroke="#52C4A6"/><text x="266" y="117">Clocked in</text>
+        <rect x="356" y="92" width="120" height="40" rx="20" fill="#0F3B33" stroke="#52C4A6"/><text x="416" y="117">In progress</text>
+        <rect x="496" y="92" width="110" height="40" rx="20" fill="#0F3B33" stroke="#52C4A6"/><text x="551" y="117">Completed</text>
+        <rect x="666" y="92" width="110" height="40" rx="20" fill="#12362A" stroke="#6FCB98"/><text x="721" y="117">Verified</text>
+        <rect x="836" y="40" width="96" height="40" rx="20" fill="#0F3B33" stroke="#52C4A6"/><text x="884" y="65">Claim</text>
+        <rect x="836" y="148" width="96" height="40" rx="20" fill="#0F3B33" stroke="#52C4A6"/><text x="884" y="173">Payroll</text>
+        <rect x="490" y="262" width="120" height="40" rx="20" fill="#3A2C15" stroke="#E8B467"/><text x="550" y="287">Flagged</text>
+      </g>
+      <g stroke="#9CC7BB" stroke-width="2" fill="none" marker-end="url(#ar)">
+        <path d="M176 112 H204"/><path d="M326 112 H354"/><path d="M476 112 H494"/><path d="M606 112 H664"/>
+        <path d="M776 104 C 800 80, 810 66, 834 62"/><path d="M776 120 C 800 144, 810 160, 834 166"/>
+        <path d="M430 132 C 440 200, 470 250, 488 274"/><path d="M610 282 C 660 270, 700 200, 716 134"/>
+      </g>
+      <g font-size="12.5" fill="#E8B467" font-weight="600">
+        <text x="150" y="190">R2 · patient matches (hard stop)</text><text x="150" y="207" fill="#9CC7BB" font-weight="400">geofence miss → flag only</text>
+        <text x="300" y="235">R3 · allergy acknowledged</text>
+        <text x="430" y="165" fill="#E8B467">R4 · clock-out</text>
+        <text x="600" y="160" fill="#6FCB98">R6 · 6/6 EVV elements</text>
+        <text x="300" y="330">R4 · end + 30 min, no clock-out</text>
+        <text x="640" y="330">R5 · reason code + supervisor · original kept</text>
+      </g>
+      <g stroke="#E8B467" stroke-width="1.2" stroke-dasharray="3 4" fill="none" opacity=".7">
+        <path d="M190 180 L 214 134"/><path d="M340 226 L 360 134"/><path d="M380 318 L 450 230"/><path d="M700 318 L 680 230"/>
+      </g>
+    </svg>
+    <h3>Transition matrix</h3>
+    <p>Rows are "from", columns are "to". A blank cell is not allowed. The matrix forces a decision for every pair of states; the red cell is a design rule: nothing is billed before it is verified.</p>
+    <div class="scroll"><table class="matrix">
+      <thead><tr><th>from \ to</th><th>Sched.</th><th>Clocked in</th><th>In progress</th><th>Completed</th><th>Flagged</th><th>Verified</th><th>Claim</th><th>Payroll</th></tr></thead>
+      <tbody>
+        <tr><td>Scheduled</td><td class="no">·</td><td class="g">R2</td><td class="no">·</td><td class="no">·</td><td class="g">R2 miss</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>Clocked in</td><td class="no">·</td><td class="no">·</td><td class="g">R3</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>In progress</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R4</td><td class="g">R4</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>Completed</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R6</td><td class="never">never</td><td class="no">·</td></tr>
+        <tr><td>Flagged</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R5</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>Verified</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="ok">●</td><td class="ok">●</td></tr>
+        <tr><td>Claim</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>Payroll</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
+      </tbody>
+    </table></div>
+    <p class="meta">Simplified for the video. A real model would add a Missed state (no clock-in by start + N), Rejected → Visit maintenance at the state aggregator, Denied → resubmit after billing, offline capture, and the actor on every transition.</p>
+  </section>
+
+  <section>
+    <h2>Trade-off: pre-filling from past visits</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Criterion</th><th>Auto-done</th><th class="chosen">Suggest + confirm</th><th>No hints</th></tr></thead>
+      <tbody>
+        <tr><td>Caregiver time</td><td class="win">fewest taps</td><td class="chosen mid">a few extra taps</td><td class="mid">middle</td></tr>
+        <tr><td>Documentation accuracy</td><td class="lose">defaults can log care that never happened</td><td class="chosen win">each task confirmed by the person who did it</td><td class="win">accurate</td></tr>
+        <tr><td>Billing risk (the claim rests on the record)</td><td class="lose">high</td><td class="chosen win">low</td><td class="win">low</td></tr>
+        <tr><td>Continuity of care</td><td class="win">keeps notes from past visits</td><td class="chosen win">keeps them as hints</td><td class="lose">loses what the last caregiver learned</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Decision:</strong> the app suggests, the caregiver confirms each task. <strong>Residual risk:</strong> tapping through suggestions without reading them. <strong>Control:</strong> no "confirm all" button; "not done" needs a reason. CMS documentation guidance warns that content populated by default may document services that were never delivered and advises against notes that need no action from their author (used here by analogy: the guidance targets clinical EHR notes).</p>
+  </section>
+
+  <section>
+    <h2>The regulation behind it</h2>
+    <ul>
+      <li><strong>Six EVV elements.</strong> Federal law defines electronic visit verification for Medicaid personal care and home health visits as verifying "the type of service performed; the individual receiving the service; the date of the service; the location of service delivery; the individual providing the service; and the time the service begins and ends" (42 U.S.C. 1396b(l)(5)(A), added by section 12006 of the 21st Century Cures Act). The statute names no technology; CMS says GPS is not required.</li>
+      <li><strong>Aggregators and edits.</strong> When agencies use different EVV systems, CMS describes a state data aggregator that combines their data; CMS says states should set rules for how visit records are edited. Reason codes for manual fixes come from state rules (for example the Texas EVV Policy Handbook, Ohio and Arizona guidance).</li>
+      <li><strong>Claim matching.</strong> In Ohio, Medicaid claims that require EVV must match a visit in the EVV system, or they are denied (phased in March 2025 – March 2026). How EVV data is checked against claims is each state's choice.</li>
+      <li><strong>Minimum necessary.</strong> HIPAA asks covered entities to make reasonable efforts to limit protected health information to the minimum necessary, and to limit workforce access by role (45 CFR 164.502(b), 164.514(d)). The trimmed visit card is a design choice in line with that principle, not something HIPAA prescribes field by field.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Sources</h2>
+    <ol class="sources">
+      <li>21st Century Cures Act, Pub. L. 114-255, §12006 · <a href="https://www.govinfo.gov/content/pkg/PLAW-114publ255/html/PLAW-114publ255.htm">govinfo.gov</a></li>
+      <li>42 U.S.C. 1396b(l) (SSA §1903(l)), US Code 2024 · <a href="https://www.govinfo.gov/content/pkg/USCODE-2024-title42/html/USCODE-2024-title42-chap7-subchapXIX-sec1396b.htm">govinfo.gov</a>; Pub. L. 115-222 (2018 delay) · <a href="https://www.govinfo.gov/content/pkg/PLAW-115publ222/html/PLAW-115publ222.htm">govinfo.gov</a></li>
+      <li>CMS, CMCS Informational Bulletin on EVV, May 16, 2018 · <a href="https://www.medicaid.gov/federal-policy-guidance/downloads/cib051618.pdf">medicaid.gov</a>; EVV FAQs · <a href="https://www.medicaid.gov/federal-policy-guidance/downloads/faq051618.pdf">medicaid.gov</a>; Additional EVV guidance, Aug 8, 2019 · <a href="https://www.medicaid.gov/federal-policy-guidance/downloads/cib080819-2.pdf">medicaid.gov</a></li>
+      <li>CMS, Documenting EVV (job aid, 2022) · <a href="https://www.medicaid.gov/medicaid/home-community-based-services/downloads/documenting-evv.pdf">medicaid.gov</a>; EVV requirements training · <a href="https://www.medicaid.gov/sites/default/files/2019-12/evv-requirements-intensive.pdf">medicaid.gov</a></li>
+      <li>Ohio Department of Medicaid, EVV Resource Guide (May 1, 2025) · <a href="https://dam.assets.ohio.gov/image/upload/medicaid.ohio.gov/Providers/EVV/EVV_Resource_Guide_05012025.pdf">medicaid.ohio.gov</a>; Ohio Adm. Code 5160-32-02</li>
+      <li>Texas HHSC, EVV Policy Handbook: 9000 Visit Maintenance, 10000 Reason Codes, 13000 EVV Claims · <a href="https://www.hhs.texas.gov/handbooks/electronic-visit-verification-policy-handbook">hhs.texas.gov</a></li>
+      <li>45 CFR 164.502(b) and 164.514(d), minimum necessary · <a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164">ecfr.gov</a>; HHS OCR guidance · <a href="https://www.hhs.gov/hipaa/for-professionals/privacy/guidance/minimum-necessary-requirement/index.html">hhs.gov</a></li>
+      <li>CMS Medicaid Program Integrity education: EHR documentation decision table (2016) · <a href="https://www.cms.gov/files/document/ehrdecisiontable062816pdf">cms.gov</a>; Preventing improper payments for personal care services · <a href="https://www.cms.gov/files/document/revised-pcs-bookletpdf">cms.gov</a>; CMCS bulletin on PCS program integrity, Dec 13, 2016 · <a href="https://www.medicaid.gov/federal-policy-guidance/downloads/cib121316.pdf">medicaid.gov</a></li>
+    </ol>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>The agency, the people and the app are fictional; no real product or brand is shown. Three versions: a synthetic narrator (Kokoro, Apache-2.0), the author's own voice synthesized with his consent (Qwen3-TTS, Apache-2.0), and a text-only version. Music and visuals are generated in code. The video is code: a narration script and deterministic canvas scenes rendered to MP4 in the author's AY0 Studio, built with Claude Code. Fonts: IBM Plex Sans, Source Serif 4, JetBrains Mono (SIL OFL). Not legal advice.</p>
+</footer>
+
+<script>
+// Version switcher: one player, three files; the version without voice is the default.
+(() => {
+  const player = document.getElementById('player'), meta = document.getElementById('vmeta'), tabs = [...document.querySelectorAll('.versions button')];
+  tabs.forEach(b => b.addEventListener('click', () => {
+    if (b.getAttribute('aria-selected') === 'true') return;
+    tabs.forEach(x => x.setAttribute('aria-selected', String(x === b)));
+    const playing = !player.paused; player.src = b.dataset.src; meta.textContent = b.dataset.meta; player.load(); if (playing) player.play().catch(() => {});
+  }));
+})();
+</script>
+<script>
+// Hexagon waves behind the header (the same field as the app in the video). Static when reduced motion is requested.
+(() => {
+  const c = document.getElementById('waves'), g = c.getContext && c.getContext('2d'); if (!g) return;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)'), R = 7, SX = Math.sqrt(3) * R, SY = 1.5 * R;
+  const P = new Uint8Array(256), V = new Float32Array(256); let s = 20261001; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 256; i++) { P[i] = i; V[i] = rnd() * 2 - 1; } for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
+  const h = (x, y, z) => V[P[(P[(P[x & 255] + y) & 255] + z) & 255]], sm = v => v * v * (3 - 2 * v), l = (a, b, k) => a + (b - a) * k;
+  const n = (x, y, z) => { const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), u = sm(x - xi), v = sm(y - yi), w = sm(z - zi), q = (a, b, d) => h(xi + a, yi + b, zi + d);
+    return l(l(l(q(0,0,0), q(1,0,0), u), l(q(0,1,0), q(1,1,0), u), v), l(l(q(0,0,1), q(1,0,1), u), l(q(0,1,1), q(1,1,1), u), v), w); };
+  let W = 0, H = 0, dpr = 1, cells = [];
+  const resize = () => { const b = c.getBoundingClientRect(); W = b.width; H = b.height; dpr = Math.min(devicePixelRatio || 1, 2); c.width = W * dpr; c.height = H * dpr; cells = [];
+    for (let y = -2 * R, r = 0; y < H + 2 * R; y += SY, r++) for (let x = -2 * R + (r % 2) * SX / 2; x < W + 2 * R; x += SX) cells.push(x, y); draw(performance.now()); };
+  const hex = new Path2D(); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; i ? hex.lineTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82) : hex.moveTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82); } hex.closePath();
+  function draw(now) { const t = reduced.matches ? 0 : now / 1000; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
+    for (let i = 0; i < cells.length; i += 2) { const x0 = cells[i], y0 = cells[i + 1], n1 = n(x0 * .045, y0 * .045, t * .2), n2 = n(x0 * .11 + 31.7, y0 * .11 - 12.3, t * .33), gust = .5 + .5 * n(x0 * .007 + 5.1, y0 * .007 + 9.7, t * .04);
+      const lift = .5 + .5 * (.65 * n1 + .35 * n2), li = lift * (.4 + .6 * gust), gl = (lift < .7 ? 0 : ((lift - .7) / .3) ** 2) * gust, m = Math.min(1, .1 + .42 * li + .4 * gl), sz = (.8 + .16 * li) * dpr, tl = .12 * n2;
+      g.setTransform(Math.cos(tl) * sz, Math.sin(tl) * sz, -Math.sin(tl) * sz, Math.cos(tl) * sz, (x0 + 1.4 * n2) * dpr, (y0 + 1.4 * n1) * dpr);
+      g.fillStyle = `rgba(${7 + 56 * m | 0},${89 + 92 * m | 0},${74 + 80 * m | 0},${(.1 + .2 * li + .22 * gl).toFixed(3)})`; g.fill(hex); } }
+  let last = 0; const frame = now => { requestAnimationFrame(frame); if (now - last < 50 || reduced.matches) return; last = now; draw(now); };
+  addEventListener('resize', resize); resize(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
