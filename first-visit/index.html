@@ -224,26 +224,127 @@ footer { padding: 32px 0 56px; color: var(--sea-muted); font-size: 14px; }
 })();
 </script>
 <script>
-// Hexagon waves behind the header (the same field as the app in the video). Static when reduced motion is requested.
+// Hexagon waves behind the header (the same field as the app in the video). Drawn on the graphics card (WebGL2) in one draw call
+// a frame, so the page stays free for the video. Without a graphics card the same waves go on a 2D canvas at CSS resolution, their
+// frame rate backs off to about a tenth of the page's time, and they rest while the video plays. Idle while the header is off screen
+// or the tab is hidden; static when reduced motion is requested.
 (() => {
-  const c = document.getElementById('waves'), g = c.getContext && c.getContext('2d'); if (!g) return;
+  let c = document.getElementById('waves'); const hero = c && c.parentElement, player = document.getElementById('player');
+  if (!hero || !c.getContext) return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)'), R = 7, SX = Math.sqrt(3) * R, SY = 1.5 * R;
   const P = new Uint8Array(256), V = new Float32Array(256); let s = 20261001; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 256; i++) { P[i] = i; V[i] = rnd() * 2 - 1; } for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
-  const h = (x, y, z) => V[P[(P[(P[x & 255] + y) & 255] + z) & 255]], sm = v => v * v * (3 - 2 * v), l = (a, b, k) => a + (b - a) * k;
-  const n = (x, y, z) => { const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), u = sm(x - xi), v = sm(y - yi), w = sm(z - zi), q = (a, b, d) => h(xi + a, yi + b, zi + d);
-    return l(l(l(q(0,0,0), q(1,0,0), u), l(q(0,1,0), q(1,1,0), u), v), l(l(q(0,0,1), q(1,0,1), u), l(q(0,1,1), q(1,1,1), u), v), w); };
-  let W = 0, H = 0, dpr = 1, cells = [];
-  const resize = () => { const b = c.getBoundingClientRect(); W = b.width; H = b.height; dpr = Math.min(devicePixelRatio || 1, 2); c.width = W * dpr; c.height = H * dpr; cells = [];
-    for (let y = -2 * R, r = 0; y < H + 2 * R; y += SY, r++) for (let x = -2 * R + (r % 2) * SX / 2; x < W + 2 * R; x += SX) cells.push(x, y); draw(performance.now()); };
-  const hex = new Path2D(); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; i ? hex.lineTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82) : hex.moveTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82); } hex.closePath();
-  function draw(now) { const t = reduced.matches ? 0 : now / 1000; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
-    for (let i = 0; i < cells.length; i += 2) { const x0 = cells[i], y0 = cells[i + 1], n1 = n(x0 * .045, y0 * .045, t * .2), n2 = n(x0 * .11 + 31.7, y0 * .11 - 12.3, t * .33), gust = .5 + .5 * n(x0 * .007 + 5.1, y0 * .007 + 9.7, t * .04);
-      const lift = .5 + .5 * (.65 * n1 + .35 * n2), li = lift * (.4 + .6 * gust), gl = (lift < .7 ? 0 : ((lift - .7) / .3) ** 2) * gust, m = Math.min(1, .1 + .42 * li + .4 * gl), sz = (.8 + .16 * li) * dpr, tl = .12 * n2;
-      g.setTransform(Math.cos(tl) * sz, Math.sin(tl) * sz, -Math.sin(tl) * sz, Math.cos(tl) * sz, (x0 + 1.4 * n2) * dpr, (y0 + 1.4 * n1) * dpr);
-      g.fillStyle = `rgba(${7 + 56 * m | 0},${89 + 92 * m | 0},${74 + 80 * m | 0},${(.1 + .2 * li + .22 * gl).toFixed(3)})`; g.fill(hex); } }
-  let last = 0; const frame = now => { requestAnimationFrame(frame); if (now - last < 50 || reduced.matches) return; last = now; draw(now); };
-  addEventListener('resize', resize); resize(); requestAnimationFrame(frame);
+  let W = 0, H = 0, cells = new Float32Array(0);
+
+  function webgl() {
+    let gl = null;   // only a real graphics card: a software WebGL would be slower than the 2D canvas
+    try { gl = c.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: true, depth: false, stencil: false, failIfMajorPerformanceCaveat: !window.__wavesAnyGL }); } catch (e) { gl = null; }
+    if (!gl) return null;
+    const drop = () => { const fresh = c.cloneNode(false); c.replaceWith(fresh); c = fresh; return null; };   // this canvas is tied to WebGL now; a fresh one lets the 2D path draw
+    let name = String(gl.getParameter(gl.RENDERER) || '');   // some browsers hand out a software WebGL despite the caveat flag
+    if (/^webkit webgl$/i.test(name)) { const d = gl.getExtension('WEBGL_debug_renderer_info'); if (d) name = String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL) || name); }
+    if (!window.__wavesAnyGL && /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name)) return drop();
+    const VS = `#version 300 es
+precision highp float;
+precision highp int;
+in vec2 aCorner;
+in vec2 aCell;
+uniform vec2 uView;
+uniform float uT;
+uniform ivec4 uPerm[64];
+uniform vec4 uVal[64];
+out vec4 vColor;
+int perm(int i) { i = i & 255; return uPerm[i >> 2][i & 3]; }
+float hash(int x, int y, int z) { int k = perm(perm(perm(x) + y) + z); return uVal[k >> 2][k & 3]; }
+float noise(vec3 p) {
+  vec3 f = floor(p);
+  ivec3 i = ivec3(f);
+  vec3 u = p - f;
+  u = u * u * (3.0 - 2.0 * u);
+  return mix(
+    mix(mix(hash(i.x, i.y, i.z), hash(i.x + 1, i.y, i.z), u.x), mix(hash(i.x, i.y + 1, i.z), hash(i.x + 1, i.y + 1, i.z), u.x), u.y),
+    mix(mix(hash(i.x, i.y, i.z + 1), hash(i.x + 1, i.y, i.z + 1), u.x), mix(hash(i.x, i.y + 1, i.z + 1), hash(i.x + 1, i.y + 1, i.z + 1), u.x), u.y),
+    u.z);
+}
+void main() {
+  float x0 = aCell.x, y0 = aCell.y;
+  float n1 = noise(vec3(x0 * 0.045, y0 * 0.045, uT * 0.2));
+  float n2 = noise(vec3(x0 * 0.11 + 31.7, y0 * 0.11 - 12.3, uT * 0.33));
+  float gust = 0.5 + 0.5 * noise(vec3(x0 * 0.007 + 5.1, y0 * 0.007 + 9.7, uT * 0.04));
+  float lift = 0.5 + 0.5 * (0.65 * n1 + 0.35 * n2);
+  float li = lift * (0.4 + 0.6 * gust);
+  float g = lift < 0.7 ? 0.0 : (lift - 0.7) / 0.3;
+  float glint = g * g * gust;
+  float m = min(1.0, 0.1 + 0.42 * li + 0.4 * glint);
+  vec3 rgb = floor(vec3(7.0, 89.0, 74.0) + vec3(56.0, 92.0, 80.0) * m);
+  float size = 0.8 + 0.16 * li, tilt = 0.12 * n2;
+  float cs = cos(tilt) * size, sn = sin(tilt) * size;
+  vec2 pos = vec2(x0 + 1.4 * n2, y0 + 1.4 * n1) + vec2(cs * aCorner.x - sn * aCorner.y, sn * aCorner.x + cs * aCorner.y);
+  gl_Position = vec4(pos.x / uView.x * 2.0 - 1.0, 1.0 - pos.y / uView.y * 2.0, 0.0, 1.0);
+  vColor = vec4(rgb / 255.0, clamp(0.1 + 0.2 * li + 0.22 * glint, 0.0, 1.0));
+}`;
+    const FS = `#version 300 es
+precision mediump float;
+in vec4 vColor;
+out vec4 outColor;
+void main() { outColor = vec4(vColor.rgb * vColor.a, vColor.a); }`;
+    let U = {}, cellBuf = null, lost = false;
+    function setup() {
+      const shader = (type, src) => { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh) || 'shader'); return sh; };
+      const prog = gl.createProgram(); gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || 'link');
+      gl.useProgram(prog); U = {}; for (const n of ['uView', 'uT', 'uPerm', 'uVal']) U[n] = gl.getUniformLocation(prog, n);
+      gl.uniform4iv(U.uPerm, Int32Array.from(P)); gl.uniform4fv(U.uVal, V);
+      gl.bindVertexArray(gl.createVertexArray());
+      const corners = new Float32Array(12); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; corners[2 * i] = Math.cos(a) * R * .82; corners[2 * i + 1] = Math.sin(a) * R * .82; }
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, corners, gl.STATIC_DRAW);
+      const aCorner = gl.getAttribLocation(prog, 'aCorner'); gl.enableVertexAttribArray(aCorner); gl.vertexAttribPointer(aCorner, 2, gl.FLOAT, false, 0, 0);
+      cellBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cellBuf); gl.bufferData(gl.ARRAY_BUFFER, cells, gl.STATIC_DRAW);
+      const aCell = gl.getAttribLocation(prog, 'aCell'); gl.enableVertexAttribArray(aCell); gl.vertexAttribPointer(aCell, 2, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(aCell, 1);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.clearColor(0, 0, 0, 0);
+    }
+    try { setup(); } catch (e) { return drop(); }
+    c.addEventListener('webglcontextlost', e => { e.preventDefault(); lost = true; });
+    c.addEventListener('webglcontextrestored', () => { try { setup(); lost = false; resize(); } catch (e) { /* the page works without its waves */ } });
+    return {
+      dpr: () => Math.min(devicePixelRatio || 1, 2), frameMs: 50, busyWhilePlaying: true,
+      resized() { if (lost) return; gl.bindBuffer(gl.ARRAY_BUFFER, cellBuf); gl.bufferData(gl.ARRAY_BUFFER, cells, gl.STATIC_DRAW); },
+      draw(t) { if (lost) return; gl.viewport(0, 0, c.width, c.height); gl.clear(gl.COLOR_BUFFER_BIT); gl.uniform2f(U.uView, W, H); gl.uniform1f(U.uT, t);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, cells.length / 2); },
+    };
+  }
+
+  function canvas2d() {
+    const g = c.getContext('2d'); if (!g) return null;
+    const h = (x, y, z) => V[P[(P[(P[x & 255] + y) & 255] + z) & 255]], sm = v => v * v * (3 - 2 * v), l = (a, b, k) => a + (b - a) * k;
+    const n = (x, y, z) => { const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), u = sm(x - xi), v = sm(y - yi), w = sm(z - zi), q = (a, b, d) => h(xi + a, yi + b, zi + d);
+      return l(l(l(q(0,0,0), q(1,0,0), u), l(q(0,1,0), q(1,1,0), u), v), l(l(q(0,0,1), q(1,0,1), u), l(q(0,1,1), q(1,1,1), u), v), w); };
+    const hex = new Path2D(); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i - Math.PI / 6; i ? hex.lineTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82) : hex.moveTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82); } hex.closePath();
+    return {
+      dpr: () => 1, frameMs: 50, busyWhilePlaying: false, resized() {},
+      draw(t) { const t0 = performance.now(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
+        for (let i = 0; i < cells.length; i += 2) { const x0 = cells[i], y0 = cells[i + 1], n1 = n(x0 * .045, y0 * .045, t * .2), n2 = n(x0 * .11 + 31.7, y0 * .11 - 12.3, t * .33), gust = .5 + .5 * n(x0 * .007 + 5.1, y0 * .007 + 9.7, t * .04);
+          const lift = .5 + .5 * (.65 * n1 + .35 * n2), li = lift * (.4 + .6 * gust), gl = (lift < .7 ? 0 : ((lift - .7) / .3) ** 2) * gust, m = Math.min(1, .1 + .42 * li + .4 * gl), sz = .8 + .16 * li, tl = .12 * n2;
+          g.setTransform(Math.cos(tl) * sz, Math.sin(tl) * sz, -Math.sin(tl) * sz, Math.cos(tl) * sz, x0 + 1.4 * n2, y0 + 1.4 * n1);
+          g.fillStyle = `rgba(${7 + 56 * m | 0},${89 + 92 * m | 0},${74 + 80 * m | 0},${(.1 + .2 * li + .22 * gl).toFixed(3)})`; g.fill(hex); }
+        this.frameMs = Math.min(400, Math.max(50, (performance.now() - t0) * 10)); },   // keeps the waves near a tenth of the page's time
+    };
+  }
+
+  const gpu = webgl(), painter = gpu || canvas2d(); if (!painter) return;
+  c.dataset.renderer = gpu ? 'webgl2' : '2d';
+  const draw = now => { if (W && H) painter.draw(reduced.matches ? 0 : now / 1000); };
+  function resize() { const b = hero.getBoundingClientRect(), d = painter.dpr(); W = b.width; H = b.height; c.width = Math.max(1, Math.round(W * d)); c.height = Math.max(1, Math.round(H * d));
+    const list = []; for (let y = -2 * R, r = 0; y < H + 2 * R; y += SY, r++) for (let x = -2 * R + (r % 2) * SX / 2; x < W + 2 * R; x += SX) list.push(x, y);
+    cells = Float32Array.from(list); painter.resized(); draw(performance.now()); }
+  let onScreen = true, last = 0;
+  if (window.IntersectionObserver) new IntersectionObserver(e => { onScreen = e[e.length - 1].isIntersecting; }).observe(hero);
+  const frame = now => { requestAnimationFrame(frame);
+    if (now - last < painter.frameMs || reduced.matches || !onScreen || document.hidden || (!painter.busyWhilePlaying && player && !player.paused)) return;
+    last = now; draw(now); };
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(hero); else addEventListener('resize', resize);
+  resize(); requestAnimationFrame(frame);
 })();
 </script>
 </body>
