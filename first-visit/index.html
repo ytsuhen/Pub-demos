@@ -7,7 +7,12 @@
 <meta name="description" content="A 3-minute business-analysis demo: one caregiver's first homecare visit, shown twice (texts and paper vs an app), then the visit's state machine, transition matrix and a pre-fill trade-off. By Andrii Yevenko.">
 <meta property="og:title" content="First Visit · a business analyst's walk through one homecare visit">
 <meta property="og:description" content="One user story → failure modes → requirements traced to regulation → a guarded state machine → a trade-off with a decision.">
-<meta property="og:image" content="poster.jpg">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ytsuhen.github.io/Pub-demos/first-visit/">
+<meta property="og:image" content="https://ytsuhen.github.io/Pub-demos/first-visit/poster.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
@@ -56,6 +61,7 @@ code, .mono { font-family: var(--font-code); font-size: .9em; }
 .chosen { background: var(--pass-soft); }
 svg text { font-family: var(--font-ui); }
 .sm { width: 100%; height: auto; display: block; background: var(--surface); border-radius: 12px; border: 1px solid var(--line); }
+.scroll > .sm { min-width: 760px; border: 0; border-radius: 0; }
 ol.sources { padding-left: 20px; font-size: 15px; } ol.sources li { margin: 4px 0; overflow-wrap: anywhere; }
 footer { padding: 32px 0 56px; color: var(--sea-muted); font-size: 14px; }
 .who { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin: 6px 0 0; font-size: 15px; }
@@ -112,15 +118,15 @@ footer { padding: 32px 0 56px; color: var(--sea-muted); font-size: 14px; }
         <tr><td>R2</td><td>Wrong entrance, 20 minutes late; the visit is noted under the wife's name (same address, two clients).</td><td>Clock-in checks location (geofence) and the person (photo + date of birth). A wrong patient is a hard stop; a geofence miss only flags.</td><td>Given two clients at one address, when the caregiver clocks in, then she must confirm the scheduled client before tasks open.</td><td><span class="tag design">design</span> derived from the EVV elements "individual receiving the service" and "location of service delivery" (42 U.S.C. 1396b(l)(5)(A))</td></tr>
         <tr><td>R3</td><td>Latex gloves from her own bag.</td><td>An allergy banner that must be acknowledged before the task list unlocks.</td><td>Given an allergy on file, when the visit starts, then tasks stay locked until the caregiver acknowledges it.</td><td><span class="tag safety">clinical safety</span></td></tr>
         <tr><td>R4</td><td>She leaves and never notes the end time.</td><td>Leaving the geofence prompts "Clock out?" with a summary; a visit still open at end + 30 min (agency setting) is flagged.</td><td>Given a visit open at end + 30 min, when there is no clock-out, then status = Flagged and the coordinator is notified.</td><td><span class="tag design">design</span> derived from "time the service begins and ends" (42 U.S.C. 1396b(l)(5)(A)); CMS: a check-in without a check-out may lead to exceptions</td></tr>
-        <tr><td>R6</td><td>The office can't tell whether the visit record is complete enough to bill.</td><td>A visit moves from <em>Completed</em> to <em>Verified</em> only when all six EVV elements are present.</td><td>Given a completed visit, when any of the six elements is missing, then it stays out of Verified and is flagged for review.</td><td><span class="tag reg">federal definition</span> 42 U.S.C. 1396b(l)(5)(A): type of service, individual receiving, date, location, individual providing, begin and end time</td></tr>
         <tr><td>R5</td><td>Next morning the office guesses an end time with no reason code; in Ohio a claim with no matching EVV visit is denied.</td><td>A manual fix needs a reason code and a supervisor's sign-off; the original record is kept.</td><td>Given a Flagged visit, when someone edits its times, then a reason code and supervisor approval are required and the original values stay in the audit trail.</td><td><span class="tag state">state rules</span> reason codes (e.g. Texas, Ohio, Arizona) + <span class="tag design">design</span> (supervisor sign-off)</td></tr>
+        <tr><td>R6</td><td>The office can't tell whether the visit record is complete enough to bill.</td><td>A visit moves from <em>Completed</em> to <em>Verified</em> only when all six EVV elements are present.</td><td>Given a completed visit, when any of the six elements is missing, then it stays out of Verified and is flagged for review.</td><td><span class="tag reg">federal definition</span> 42 U.S.C. 1396b(l)(5)(A): type of service, individual receiving, date, location, individual providing, begin and end time</td></tr>
       </tbody>
     </table></div>
   </section>
 
   <section>
     <h2>The visit as a state machine</h2>
-    <svg class="sm" viewBox="0 0 960 380" role="img" aria-label="Visit state machine: Scheduled to Clocked in to In progress to Completed to Verified, which forks to Claim and Payroll; In progress can go to Flagged, and Flagged returns to Verified with a reason code and supervisor sign-off.">
+    <div class="scroll"><svg class="sm" viewBox="0 0 960 380" role="img" aria-label="Visit state machine: Scheduled to Clocked in to In progress to Completed to Verified, which forks to Claim and Payroll; In progress goes to Flagged when there is no clock-out, Completed goes to Flagged when an EVV element is missing, and Flagged returns to Verified with a reason code and supervisor sign-off, then the six-element check.">
       <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9CC7BB"/></marker></defs>
       <rect x="40" y="60" width="580" height="104" rx="18" fill="rgba(82,196,166,0.07)" stroke="rgba(82,196,166,0.35)" stroke-dasharray="6 6"/>
       <text x="56" y="52" fill="#52C4A6" font-size="13" font-weight="600">R1 · visit card visible (only what this visit needs)</text>
@@ -137,30 +143,31 @@ footer { padding: 32px 0 56px; color: var(--sea-muted); font-size: 14px; }
       <g stroke="#9CC7BB" stroke-width="2" fill="none" marker-end="url(#ar)">
         <path d="M176 112 H204"/><path d="M326 112 H354"/><path d="M476 112 H494"/><path d="M606 112 H664"/>
         <path d="M776 104 C 800 80, 810 66, 834 62"/><path d="M776 120 C 800 144, 810 160, 834 166"/>
-        <path d="M430 132 C 440 200, 470 250, 488 274"/><path d="M610 282 C 660 270, 700 200, 716 134"/>
+        <path d="M430 132 C 440 200, 470 250, 488 274"/><path d="M551 132 V 260"/><path d="M610 282 C 730 282, 762 220, 762 134"/>
       </g>
       <g font-size="12.5" fill="#E8B467" font-weight="600">
         <text x="150" y="190">R2 · patient matches (hard stop)</text><text x="150" y="207" fill="#9CC7BB" font-weight="400">geofence miss → flag only</text>
         <text x="300" y="235">R3 · allergy acknowledged</text>
-        <text x="430" y="165" fill="#E8B467">R4 · clock-out</text>
-        <text x="600" y="160" fill="#6FCB98">R6 · 6/6 EVV elements</text>
+        <text x="485" y="86" text-anchor="middle">R4 · clock-out</text>
+        <text x="628" y="150" fill="#6FCB98">R6 · 6/6 EVV</text><text x="628" y="166" fill="#9CC7BB" font-weight="400">elements present</text>
+        <text x="560" y="205">R6 · element missing</text>
         <text x="300" y="330">R4 · end + 30 min, no clock-out</text>
-        <text x="640" y="330">R5 · reason code + supervisor · original kept</text>
+        <text x="640" y="322">R5 · reason code + supervisor</text><text x="640" y="339" fill="#9CC7BB" font-weight="400">original kept, then R6</text>
       </g>
       <g stroke="#E8B467" stroke-width="1.2" stroke-dasharray="3 4" fill="none" opacity=".7">
-        <path d="M190 180 L 214 134"/><path d="M340 226 L 360 134"/><path d="M380 318 L 450 230"/><path d="M700 318 L 680 230"/>
+        <path d="M190 180 L 214 134"/><path d="M340 226 L 360 134"/><path d="M380 318 L 450 230"/><path d="M704 308 L 690 280"/>
       </g>
-    </svg>
+    </svg></div>
     <h3>Transition matrix</h3>
     <p>Rows are "from", columns are "to". A blank cell is not allowed. The matrix forces a decision for every pair of states; the red cell is a design rule: nothing is billed before it is verified.</p>
     <div class="scroll"><table class="matrix">
       <thead><tr><th>from \ to</th><th>Sched.</th><th>Clocked in</th><th>In progress</th><th>Completed</th><th>Flagged</th><th>Verified</th><th>Claim</th><th>Payroll</th></tr></thead>
       <tbody>
-        <tr><td>Scheduled</td><td class="no">·</td><td class="g">R2</td><td class="no">·</td><td class="no">·</td><td class="g">R2 miss</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>Scheduled</td><td class="no">·</td><td class="g">R2 (+flag)</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
         <tr><td>Clocked in</td><td class="no">·</td><td class="no">·</td><td class="g">R3</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
         <tr><td>In progress</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R4</td><td class="g">R4</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
-        <tr><td>Completed</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R6</td><td class="never">never</td><td class="no">·</td></tr>
-        <tr><td>Flagged</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R5</td><td class="no">·</td><td class="no">·</td></tr>
+        <tr><td>Completed</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R6 miss</td><td class="g">R6</td><td class="never">never</td><td class="no">·</td></tr>
+        <tr><td>Flagged</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="g">R5+R6</td><td class="no">·</td><td class="no">·</td></tr>
         <tr><td>Verified</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="ok">●</td><td class="ok">●</td></tr>
         <tr><td>Claim</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
         <tr><td>Payroll</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td><td class="no">·</td></tr>
@@ -209,7 +216,7 @@ footer { padding: 32px 0 56px; color: var(--sea-muted); font-size: 14px; }
 </main>
 
 <footer class="wrap">
-  <p>The agency, the people and the app are fictional; no real product or brand is shown. Three versions: a synthetic narrator (Kokoro, Apache-2.0), the author's own voice synthesized with his consent (Qwen3-TTS, Apache-2.0), and a text-only version. Music and visuals are generated in code. The video is code: a narration script and deterministic canvas scenes rendered to MP4 in the author's AY0 Studio, built with Claude Code. Fonts: IBM Plex Sans, Source Serif 4, JetBrains Mono (SIL OFL). Not legal advice.</p>
+  <p>The agency, the people and the app are fictional; no real product or brand is shown. Three versions: a synthetic narrator (Kokoro, Apache-2.0), the author's own voice, cloned from his recordings (Qwen3-TTS, Apache-2.0), and a text-only version. Music and visuals are generated in code. The video is code: a narration script and deterministic canvas scenes rendered to MP4 in the author's AY0 Studio, built with Claude Code. Fonts: IBM Plex Sans, Source Serif 4, JetBrains Mono (SIL OFL). Not legal advice.</p>
 </footer>
 
 <script>
