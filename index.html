@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Andrii Yevenko · Demos</title>
-<meta name="description" content="Video demos by Andrii Yevenko: business analysis and clinical informatics.">
+<meta name="description" content="Demos by Andrii Yevenko: business analysis and clinical informatics.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
 <style>
 :root { --deep: #041716; --sea: #0C433C; --ink: #E3F4EE; --muted: #9CC7BB; --line: #1D3F39; --surface: #0A2622; --accent: #52C4A6; }
@@ -13,22 +13,35 @@ body { margin: 0; min-height: 100vh; color: var(--ink); background: radial-gradi
 .wrap { max-width: 880px; margin: 0 auto; padding: 48px 16px; }
 h1 { font: 600 clamp(28px, 4vw, 40px)/1.15 "Source Serif 4", Georgia, serif; margin: 0 0 8px; }
 p { color: var(--muted); margin: 0 0 28px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.cards a.card:first-child { grid-column: 1 / -1; }
 a.card { display: block; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 a.card:hover { border-color: var(--accent); }
 a.card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
 a.card div { padding: 14px 18px 18px; }
 a.card h2 { font: 600 22px/1.25 "Source Serif 4", Georgia, serif; margin: 0 0 4px; }
 a.card span { color: var(--muted); font-size: 15px; }
+a.card small { display: block; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; line-height: 1.5; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Demos</h1>
-  <p>Andrii Yevenko · emergency physician · 7 years as a physician analyst in US healthtech · <a href="https://www.linkedin.com/in/andrii-yevenko" style="color:#52C4A6">LinkedIn</a> · <a href="https://github.com/ytsuhen" style="color:#52C4A6">GitHub</a><br>The analysis, the requirements and the review are mine; the pages and the videos are built by AI coding agents (Claude Code).</p>
-  <a class="card" href="first-visit/">
-    <img src="first-visit/poster.jpg" alt="First Visit: split screen, texts and paper on the left, the app on the right">
-    <div><h2>First Visit</h2><span>Business analysis demo (about 3 min, three versions): one homecare visit shown twice, then its state machine, transition matrix and a pre-fill trade-off.</span></div>
-  </a>
+  <p>Andrii Yevenko · emergency physician · 7 years as a physician analyst in US healthtech · <a href="https://www.linkedin.com/in/andrii-yevenko" style="color:#52C4A6">LinkedIn</a> · <a href="https://github.com/ytsuhen" style="color:#52C4A6">GitHub</a><br>The code in these demos was written by AI coding agents (Claude Code). Each card says what is mine and what the agents did.</p>
+  <div class="cards">
+    <a class="card" href="first-visit/">
+      <img src="first-visit/poster.jpg" alt="First Visit: split screen, texts and paper on the left, the app on the right">
+      <div><h2>First Visit</h2><span>Business analysis demo (about 3 min, three versions): one homecare visit shown twice, then its state machine, transition matrix and a pre-fill trade-off.</span><small>Mine: the analysis, the requirements and the review. Agents: the page and the videos.</small></div>
+    </a>
+    <a class="card" href="https://ytsuhen.github.io/CQL-Demo-Yevenko/">
+      <img src="cards/cql-demo.jpg" alt="Clinical rules in CQL: a patient chat about a headache next to the facts the engine received and the decision it made">
+      <div><h2>Clinical rules in CQL over FHIR</h2><span>Headache triage and PHQ-9 / GAD-7 screening written as executable clinical rules. All 31 test scenarios run in the page.</span><small>Mine: the task, the clinical decisions and the review. Agents: the protocol draft, the CQL, the test patients, the engine, the page and CI.</small></div>
+    </a>
+    <a class="card" href="https://ytsuhen.github.io/MedRegNav/">
+      <img src="cards/medregnav.jpg" alt="MedReg Navigator: answers about a piece of medical software and a map of the requirements that follow">
+      <div><h2>MedReg Navigator</h2><span>Proof of concept, in Ukrainian with an English switch: describe medical software and see its EU MDR class, AI Act status and 44 obligations, each with a verbatim quote.</span><small>Mine: the idea, the scope and the quality rules. Agents: the code, the data, the readings of the rules and the checks. No regulatory specialist has reviewed the rules.</small></div>
+    </a>
+  </div>
 </div>
 </body>
 </html>
